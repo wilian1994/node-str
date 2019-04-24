@@ -3,6 +3,9 @@
 const mongoose = require('mongoose');
 const Product = mongoose.model('Product');
 
+//Importando a classe de validação
+const ValidationContract =  require('../validators/validator');
+
 exports.get = (req, res, next) => {
     //trazendo todos os produtos que estão ativo e somente o title, price and slug
     Product
@@ -20,6 +23,15 @@ exports.get = (req, res, next) => {
 }
 
 exports.post = (req, res, next) => {
+
+    let contract = new ValidationContract();
+    contract.hasMinLen(req.body.title, 3, 'O título deve conter pelo menos 3 caracteres');
+
+    if(!contract.isValid()){
+        res.status(400).send(contract.errors()).end();
+        return;
+    }
+
     var product = new Product(req.body);
     product
         .save()
@@ -36,15 +48,38 @@ exports.post = (req, res, next) => {
 }
 
 exports.put =  (req, res, next) => {
-    const id = req.params.id;
-    res.status(201).send({
-        id: id,
-        item: req.body
-    })
+    Product
+        .findByIdAndUpdate(req.params.id, {
+            $set: {
+                title: req.body.title,
+                description: req.body.description,
+                price: req.body.price
+            }
+        }).then(x => {
+            res.status(201).send({
+                message: 'Produto atualizado com sucesso!'
+            });
+        }).catch(e => {
+            res.status(400).send({
+                message: 'Falha ao atualizar produto',
+                data: e
+            })
+        })
 }
 
 exports.delete = (req, res, next) => {
-    res.status(200).send(req.body);
+    Product
+    .findOneAndRemove(req.params.id)
+    .then(x => {
+        res.status(201).send({
+            message: 'Produto removido com sucesso!'
+        });
+    }).catch(e => {
+        res.status(400).send({
+            message: 'Falha ao remover produto',
+            data: e
+        })
+    })
 }
 
 //listando produtos pelo slug
@@ -52,6 +87,35 @@ exports.getBySlug = (req, res, next) => {
     Product
         .findOne({
             slug:req.params.slug,
+            active: true
+        }, 'title price slug tags')
+        .then(data => {
+            res.status(200).send({data});
+        }).catch(e => {
+            res.status(400).send({
+                message: 'Falha ao cadastrar o produto',
+                data: e
+            });
+        });
+}
+
+exports.getById = (req, res, next) => {
+    Product
+        .findById(req.params.id)
+        .then(data => {
+            res.status(200).send({data});
+        }).catch(e => {
+            res.status(400).send({
+                message: 'Falha ao cadastrar o produto',
+                data: e
+            });
+        });
+}
+
+exports.getByTag = (req, res, next) => {
+    Product
+        .find({
+            tag:req.params.tag,
             active: true
         }, 'title price slug tags')
         .then(data => {
